@@ -1,0 +1,29 @@
+dataset:
+  name: dialogsum
+  language: en
+  train_path: data/dialogsum/train.jsonl
+  validation_path: data/dialogsum/validation.jsonl
+  test_path: data/dialogsum/test.jsonl
+model:
+  backbone: meta-llama/Llama-2-13b-hf
+  fusion_backbone: meta-llama/Llama-2-13b-hf
+  total_layers: 40
+  expert_layers: 5
+  num_experts: 4
+  top_k: 2
+  soft_prompt_length: 8
+  trust_remote_code: false
+engineering:
+  max_roles: 16
+  max_source_tokens: 1024
+  max_target_tokens: 128
+  learning_rate: 0.00002
+  weight_decay: 0.0
+  batch_size: 1
+  gradient_accumulation: 8
+  epochs: 3
+  seed: 13
+  dtype: bfloat16
+  max_new_tokens: 128
+  num_beams: 4
+  length_penalty: 1.0

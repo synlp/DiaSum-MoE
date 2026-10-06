@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diasum-moe"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+  "torch>=2.1",
+  "transformers==4.46.3",
+  "sentencepiece>=0.2",
+  "accelerate>=0.33",
+  "PyYAML>=6.0",
+  "rouge-score>=0.1.2",
+  "sacrebleu>=2.4"
+]
+
+[project.optional-dependencies]
+contextual-metrics = ["bert-score>=0.3.13"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["diasum_moe*"]
