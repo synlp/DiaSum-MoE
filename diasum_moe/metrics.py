@@ -2,19 +2,20 @@ from collections import defaultdict
 from statistics import mean
 
 
-def metric_text(text: str, language: str) -> str:
+def metric_text(text, language):
     normalized = " ".join(text.strip().split())
     if language.lower().startswith("zh"):
+        # Chinese overlap metrics use characters rather than English word tokens.
         normalized = " ".join(character for character in normalized if not character.isspace())
     return normalized
 
 
 class ChineseTokenizer:
-    def tokenize(self, text: str) -> list[str]:
+    def tokenize(self, text):
         return metric_text(text, "zh").split()
 
 
-def overlap_metrics(predictions: list[str], references: list[str], language: str) -> dict[str, float]:
+def overlap_metrics(predictions, references, language):
     if not predictions or len(predictions) != len(references):
         raise ValueError("predictions and references must be nonempty and aligned")
     language = language.lower()
@@ -25,7 +26,7 @@ def overlap_metrics(predictions: list[str], references: list[str], language: str
         raise RuntimeError("ROUGE and BLEU require rouge-score and sacrebleu") from error
     tokenizer = ChineseTokenizer() if language.startswith("zh") else None
     scorer = rouge_scorer.RougeScorer(["rouge1", "rouge2", "rougeL"], use_stemmer=language.startswith("en"), tokenizer=tokenizer)
-    scores: dict[str, list[float]] = defaultdict(list)
+    scores = defaultdict(list)
     normalized_predictions = [metric_text(text, language) for text in predictions]
     normalized_references = [metric_text(text, language) for text in references]
     for prediction, reference in zip(normalized_predictions, normalized_references):
@@ -37,7 +38,7 @@ def overlap_metrics(predictions: list[str], references: list[str], language: str
     return {"rouge1": mean(scores["rouge1"]), "rouge2": mean(scores["rouge2"]), "rougeL": mean(scores["rougeL"]), "bleu": bleu}
 
 
-def bertscore_metric(predictions: list[str], references: list[str], language: str, model_type: str | None) -> float:
+def bertscore_metric(predictions, references, language, model_type):
     try:
         from bert_score import score
     except ImportError as error:
@@ -46,7 +47,7 @@ def bertscore_metric(predictions: list[str], references: list[str], language: st
     return float(f1.mean() * 100)
 
 
-def moverscore_metric(predictions: list[str], references: list[str]) -> float:
+def moverscore_metric(predictions, references):
     try:
         from moverscore_v2 import get_idf_dict, word_mover_score
     except ImportError as error:
@@ -63,7 +64,5 @@ def moverscore_metric(predictions: list[str], references: list[str]) -> float:
         remove_subwords=True,
     )
     return mean(float(value) for value in values) * 100
-
-
 
 

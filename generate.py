@@ -8,7 +8,7 @@ from diasum_moe.config import load_settings
 from diasum_moe.runtime import build_loader, build_model, build_tokenizer_and_collator, dataset_for_split, set_seed
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     parser.add_argument("--checkpoint", required=True)
@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def generate() -> None:
+def generate():
     args = parse_args()
     settings = load_settings(args.config)
     set_seed(settings.engineering.seed)
@@ -28,6 +28,7 @@ def generate() -> None:
     model = build_model(settings, tokenizer, args.checkpoint)
     device = torch.device(args.device)
     model.to(device)
+    # Turn off dropout before decoding summaries.
     model.eval()
     loader = build_loader(dataset, collator, 1, False)
     destination = Path(args.output)

@@ -8,7 +8,7 @@ from diasum_moe.config import load_settings
 from diasum_moe.runtime import build_loader, build_model, build_tokenizer_and_collator, dataset_for_split, set_seed
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     parser.add_argument("--train-path")
@@ -17,7 +17,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def train() -> None:
+def train():
     args = parse_args()
     settings = load_settings(args.config)
     set_seed(settings.engineering.seed)
@@ -46,6 +46,7 @@ def train() -> None:
             output = model(batch)
             if output.loss is None or not torch.isfinite(output.loss):
                 raise FloatingPointError("Non-finite training loss")
+            # The final accumulation window may contain fewer batches.
             window_start = ((step - 1) // accumulation) * accumulation
             window_size = min(accumulation, len(loader) - window_start)
             (output.loss / window_size).backward()
@@ -55,6 +56,7 @@ def train() -> None:
                 optimizer.zero_grad(set_to_none=True)
                 updates += 1
         checkpoint = output_dir / f"epoch-{epoch + 1}.pt"
+        # Save weights after every epoch.
         torch.save(model.state_dict(), checkpoint)
         report = {"epoch": epoch + 1, "loss": total_loss / len(loader), "updates": updates, "checkpoint": str(checkpoint)}
         print(json.dumps(report, ensure_ascii=False))

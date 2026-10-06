@@ -61,6 +61,10 @@ DiaSum-MoE/
 
 `diasum_moe/model.py` implements routing, experts, and fusion. The other modules in `diasum_moe/` handle dialogue data, settings, runtime setup, and metrics. `configs/dialogsum.yaml` contains the run configuration. Run the four root-level entry scripts directly.
 
+## Acknowledgments
+
+LLaMA decoder layers, rotary embeddings, generation, and the causal attention-mask helper are provided by [Hugging Face Transformers v4.46.3](https://github.com/huggingface/transformers/tree/v4.46.3), licensed under Apache-2.0. The upstream LLaMA implementation credits EleutherAI and the Hugging Face team. LLaMA-2 model weights are subject to Meta's model license linked above.
+
 ## Citation
 
 If you use this code, please cite the paper.

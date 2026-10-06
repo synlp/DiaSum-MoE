@@ -1,12 +1,11 @@
 import argparse
 import json
 from pathlib import Path
-from typing import Any
 
 from diasum_moe.metrics import bertscore_metric, moverscore_metric, overlap_metrics
 
 
-def read_jsonl(path: str | Path) -> list[dict[str, Any]]:
+def read_jsonl(path):
     source = Path(path)
     if not source.is_file():
         raise FileNotFoundError(f"Evaluation file not found: {source}")
@@ -17,7 +16,7 @@ def read_jsonl(path: str | Path) -> list[dict[str, Any]]:
     return records
 
 
-def evaluate_file(path: str, language: str, bertscore: bool, moverscore: bool, bert_model: str | None) -> dict[str, float]:
+def evaluate_file(path, language, bertscore, moverscore, bert_model):
     records = read_jsonl(path)
     predictions = [str(record["prediction"]) for record in records]
     references = [str(record["reference"]) for record in records]
@@ -29,7 +28,7 @@ def evaluate_file(path: str, language: str, bertscore: bool, moverscore: bool, b
     return metrics
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--predictions", required=True)
     parser.add_argument("--language", choices=("en", "zh"), required=True)
@@ -40,7 +39,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def evaluate() -> None:
+def evaluate():
     args = parse_args()
     result = evaluate_file(args.predictions, args.language, args.bertscore, args.moverscore, args.bertscore_model)
     serialized = json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True)

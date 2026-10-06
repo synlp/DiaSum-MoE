@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -25,7 +24,7 @@ class ModelSettings:
     soft_prompt_length: int
     trust_remote_code: bool
 
-    def validate_paper_defaults(self) -> None:
+    def validate_paper_defaults(self):
         values = (self.total_layers, self.expert_layers, self.num_experts, self.top_k)
         if values != (40, 5, 4, 2):
             raise ValueError("Paper settings require 40 layers, 5 expert layers, 4 experts, and top-2 routing")
@@ -55,13 +54,13 @@ class ExperimentSettings:
     engineering: EngineeringSettings
 
 
-def _require(mapping: dict[str, Any], key: str) -> Any:
+def _require(mapping, key):
     if key not in mapping:
         raise ValueError(f"Missing config field: {key}")
     return mapping[key]
 
 
-def load_settings(path: str | Path) -> ExperimentSettings:
+def load_settings(path):
     config_path = Path(path)
     if not config_path.is_file():
         raise FileNotFoundError(f"Config not found: {config_path}")
@@ -89,6 +88,7 @@ def load_settings(path: str | Path) -> ExperimentSettings:
         soft_prompt_length=int(_require(model_raw, "soft_prompt_length")),
         trust_remote_code=bool(model_raw.get("trust_remote_code", False)),
     )
+    # Keep the published expert layout fixed across runs.
     model.validate_paper_defaults()
     engineering = EngineeringSettings(
         max_roles=int(_require(engineering_raw, "max_roles")),

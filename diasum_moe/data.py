@@ -2,7 +2,6 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
 
 import torch
 from torch.utils.data import Dataset
@@ -32,7 +31,7 @@ class DialogueBatch:
     routing_positions: list[list[int]]
     example_ids: list[str]
 
-    def to(self, device: torch.device | str) -> "DialogueBatch":
+    def to(self, device):
         return DialogueBatch(
             input_ids=self.input_ids.to(device),
             attention_mask=self.attention_mask.to(device),
@@ -44,7 +43,7 @@ class DialogueBatch:
         )
 
 
-def _load_records(path: str | Path) -> list[dict[str, Any]]:
+def _load_records(path):
     source = Path(path)
     if not source.is_file():
         raise FileNotFoundError(f"Dataset file not found: {source}")
@@ -63,7 +62,7 @@ def _load_records(path: str | Path) -> list[dict[str, Any]]:
     return records
 
 
-def _required_text(record: dict[str, Any], keys: Iterable[str], label: str) -> str:
+def _required_text(record, keys, label):
     for key in keys:
         value = record.get(key)
         if isinstance(value, str) and value.strip():
@@ -71,11 +70,10 @@ def _required_text(record: dict[str, Any], keys: Iterable[str], label: str) -> s
     raise ValueError(f"Missing {label}; expected one of {list(keys)}")
 
 
-
-
-def _prefixed_dialogue(text: str) -> tuple[Utterance, ...]:
-    utterances: list[Utterance] = []
+def _prefixed_dialogue(text):
+    utterances = []
     pattern = re.compile(r"^\s*([^:：\n]{1,80})\s*[:：]\s*(.+?)\s*$")
+    # DialogSum role markers distinguish new turns from wrapped lines.
     if text.lstrip().startswith("#Person"):
         pattern = re.compile(r"^\s*(#Person\d+#)\s*[:：]\s*(.+?)\s*$")
     for line in text.splitlines():
@@ -94,9 +92,7 @@ def _prefixed_dialogue(text: str) -> tuple[Utterance, ...]:
     return tuple(utterances)
 
 
-
-
-def _record_id(record: dict[str, Any], index: int) -> str:
+def _record_id(record, index):
     for key in ("id", "fname", "DialogueID", "dialogue_id", "case_id"):
         value = record.get(key)
         if value is not None:
@@ -105,22 +101,22 @@ def _record_id(record: dict[str, Any], index: int) -> str:
 
 
 class DialogueDataset(Dataset[DialogueExample]):
-    def __init__(self, examples: list[DialogueExample]):
+    def __init__(self, examples):
         self.examples = examples
 
-    def __len__(self) -> int:
+    def __len__(self):
         return len(self.examples)
 
-    def __getitem__(self, index: int) -> DialogueExample:
+    def __getitem__(self, index):
         return self.examples[index]
 
     @property
-    def speakers(self) -> tuple[str, ...]:
+    def speakers(self):
         return tuple(sorted({utterance.speaker for example in self.examples for utterance in example.utterances}))
 
 
-def load_dialogsum(path: str | Path) -> DialogueDataset:
-    examples: list[DialogueExample] = []
+def load_dialogsum(path):
+    examples = []
     for index, record in enumerate(_load_records(path)):
         dialogue = _required_text(record, ("dialogue",), "dialogue")
         utterances = _prefixed_dialogue(dialogue)
@@ -128,30 +124,21 @@ def load_dialogsum(path: str | Path) -> DialogueDataset:
         if isinstance(record.get("summary"), str) and record["summary"].strip():
             examples.append(DialogueExample(example_id, utterances, record["summary"].strip(), {}))
         else:
+            # The official test split supplies three summaries per dialogue.
             for reference_index in (1, 2, 3):
                 summary = _required_text(record, (f"summary{reference_index}",), "summary")
                 examples.append(DialogueExample(f"{example_id}_ref{reference_index}", utterances, summary, {}))
     return DialogueDataset(examples)
 
 
-
-
-
-
-
-
-
-
-def load_dataset(name: str, path: str | Path) -> DialogueDataset:
+def load_dataset(name, path):
     if name.lower() != "dialogsum":
         raise ValueError("dataset.name must be dialogsum for this configuration")
     return load_dialogsum(path)
 
 
-
-
 class DialogueCollator:
-    def __init__(self, tokenizer: Any, max_roles: int, max_source_tokens: int, max_target_tokens: int):
+    def __init__(self, tokenizer, max_roles, max_source_tokens, max_target_tokens):
         self.tokenizer = tokenizer
         self.role_tokens = tuple(f"<|role_{index}|>" for index in range(max_roles))
         self.max_source_tokens = max_source_tokens
@@ -162,13 +149,14 @@ class DialogueCollator:
                 raise ValueError("Tokenizer requires pad or EOS token")
             tokenizer.pad_token = tokenizer.eos_token
 
-    def _encode_dialogue(self, example: DialogueExample) -> tuple[list[int], list[tuple[int, int]], list[int]]:
-        input_ids: list[int] = []
+    def _encode_dialogue(self, example):
+        input_ids = []
         if self.tokenizer.bos_token_id is not None:
             input_ids.append(self.tokenizer.bos_token_id)
-        spans: list[tuple[int, int]] = []
-        routing_positions: list[int] = []
-        local_roles: dict[str, int] = {}
+        spans = []
+        routing_positions = []
+        # Assign role tokens by first appearance in this dialogue.
+        local_roles = {}
         for utterance in example.utterances:
             if utterance.speaker not in local_roles:
                 if len(local_roles) == len(self.role_tokens):
@@ -180,11 +168,13 @@ class DialogueCollator:
             if available < 2:
                 break
             content_ids = text_ids[: available - 1]
+            # A trailing role token can attend to the complete utterance.
             utterance_ids = content_ids + [role_id]
             if self.tokenizer.eos_token_id is not None and len(utterance_ids) < available:
                 utterance_ids.append(self.tokenizer.eos_token_id)
             start = len(input_ids)
             input_ids.extend(utterance_ids)
+            # The expert span includes the role token, but excludes EOS.
             expert_end = start + len(content_ids) + 1
             spans.append((start, expert_end))
             routing_positions.append(expert_end - 1)
@@ -192,13 +182,14 @@ class DialogueCollator:
             raise ValueError(f"No utterance fits max_source_tokens for {example.example_id}")
         return input_ids, spans, routing_positions
 
-    def __call__(self, examples: list[DialogueExample]) -> DialogueBatch:
+    def __call__(self, examples):
         if not examples:
             raise ValueError("Empty batch")
         encoded = [self._encode_dialogue(example) for example in examples]
         source_length = max(len(item[0]) for item in encoded)
-        target_rows: list[list[int]] = []
+        target_rows = []
         for example in examples:
+            # Reserve the last target position for EOS.
             target = self.tokenizer.encode(example.summary, add_special_tokens=False)[: self.max_target_tokens - 1]
             if self.tokenizer.eos_token_id is not None:
                 target.append(self.tokenizer.eos_token_id)
